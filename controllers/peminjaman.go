@@ -22,6 +22,24 @@ func SetPeminjamanCollection(db *mongo.Database) {
 }
 
 
+func GetPeminjamanByID(c *fiber.Ctx) error {
+	id, err := primitive.ObjectIDFromHex(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "ID tidak valid"})
+	}
+
+	var peminjaman models.Peminjaman
+	err = peminjamanCollection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&peminjaman)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return c.Status(404).JSON(fiber.Map{"error": "Data peminjaman tidak ditemukan"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(peminjaman)
+}
+
 func GetAllPeminjaman(c *fiber.Ctx) error {
 	cursor, err := peminjamanCollection.Find(context.Background(), bson.M{})
 	if err != nil {
@@ -118,4 +136,38 @@ func UpdateStatusPeminjaman(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"message": "Status berhasil diperbarui"})
+}
+
+func DeletePeminjaman(c *fiber.Ctx) error {
+    id, err := primitive.ObjectIDFromHex(c.Params("id"))
+    if err != nil {
+        return c.Status(400).JSON(fiber.Map{"error": "ID tidak valid"})
+    }
+
+    // Cari data peminjaman yang akan dihapus
+    var peminjaman models.Peminjaman
+    err = peminjamanCollection.FindOne(context.Background(), bson.M{"_id": id}).Decode(&peminjaman)
+    if err != nil {
+        return c.Status(404).JSON(fiber.Map{"error": "Data peminjaman tidak ditemukan"})
+    }
+
+    // Jika status masih "dipinjam", kembalikan stok barang
+    if peminjaman.Status == "dipinjam" {
+        _, err = barangCollectionPeminjaman.UpdateOne(
+            context.Background(),
+            bson.M{"_id": peminjaman.BarangID},
+            bson.M{"$inc": bson.M{"stok": peminjaman.Jumlah}},
+        )
+        if err != nil {
+            return c.Status(500).JSON(fiber.Map{"error": "Gagal mengembalikan stok barang"})
+        }
+    }
+
+    // Hapus data peminjaman
+    _, err = peminjamanCollection.DeleteOne(context.Background(), bson.M{"_id": id})
+    if err != nil {
+        return c.Status(500).JSON(fiber.Map{"error": "Gagal menghapus data peminjaman"})
+    }
+
+    return c.Status(200).JSON(fiber.Map{"message": "Data peminjaman berhasil dihapus"})
 }

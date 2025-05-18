@@ -12,4 +12,6 @@ func RegisterPeminjamanRoutes(router fiber.Router) {
 	peminjaman.Get("/", controllers.GetAllPeminjaman)
 	peminjaman.Post("/", controllers.CreatePeminjaman)
 	peminjaman.Put("/:id", controllers.UpdateStatusPeminjaman)
+	peminjaman.Delete("/:id", controllers.DeletePeminjaman)
+	peminjaman.Get("/:id", controllers.GetPeminjamanByID)
 }
